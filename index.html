@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 추첨 프로그램</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="file"],
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .number-inputs {
+            display: flex;
+            gap: 20px;
+        }
+        .number-inputs .input-group {
+            flex: 1;
+        }
+        button {
+            padding: 12px 30px;
+            margin: 10px 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .btn-draw {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-draw:hover {
+            background-color: #45a049;
+        }
+        .btn-draw:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-download {
+            background-color: #2196F3;
+            color: white;
+        }
+        .btn-download:hover {
+            background-color: #0b7dda;
+        }
+        .btn-download:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .button-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .results h2 {
+            color: #333;
+        }
+        .results-list {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .results-list div {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .results-list div:last-child {
+            border-bottom: none;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .info {
+            color: #666;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>학생 추첨 프로그램</h1>
+        
+        <div class="input-group">
+            <label for="csvFile">CSV 파일 업로드:</label>
+            <input type="file" id="csvFile" accept=".csv">
+            <div class="info">CSV 파일에는 한 열에 학생 식별번호가 포함되어야 합니다.</div>
+        </div>
+
+        <div class="number-inputs">
+            <div class="input-group">
+                <label for="totalStudents">전체 학생 수 (x):</label>
+                <input type="number" id="totalStudents" min="1" placeholder="예: 39">
+            </div>
+            <div class="input-group">
+                <label for="drawCount">추첨할 학생 수 (y):</label>
+                <input type="number" id="drawCount" min="1" placeholder="예: 36">
+            </div>
+        </div>
+
+        <div class="error" id="errorMessage"></div>
+
+        <div class="button-group">
+            <button class="btn-draw" id="drawButton" onclick="performDraw()">추첨</button>
+            <button class="btn-download" id="downloadButton" onclick="downloadResults()" disabled>다운로드</button>
+        </div>
+
+        <div class="results" id="resultsSection" style="display: none;">
+            <h2>추첨 결과</h2>
+            <div class="results-list" id="resultsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let studentsData = [];
+        let selectedStudents = [];
+
+        // CSV 파일 읽기
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const text = event.target.result;
+                parseCSV(text);
+            };
+            reader.readAsText(file);
+        });
+
+        // CSV 파싱
+        function parseCSV(text) {
+            studentsData = [];
+            const lines = text.split('\n');
+            
+            for (let line of lines) {
+                const trimmed = line.trim();
+                if (trimmed) {
+                    studentsData.push(trimmed);
+                }
+            }
+            
+            document.getElementById('errorMessage').textContent = '';
+            console.log(`Loaded ${studentsData.length} students`);
+        }
+
+        // 추첨 수행
+        function performDraw() {
+            const totalStudents = parseInt(document.getElementById('totalStudents').value);
+            const drawCount = parseInt(document.getElementById('drawCount').value);
+            const errorElement = document.getElementById('errorMessage');
+            
+            // 유효성 검사
+            errorElement.textContent = '';
+            
+            if (!studentsData || studentsData.length === 0) {
+                errorElement.textContent = '오류: CSV 파일을 먼저 업로드해주세요.';
+                return;
+            }
+            
+            if (!totalStudents || totalStudents <= 0) {
+                errorElement.textContent = '오류: 전체 학생 수를 입력해주세요.';
+                return;
+            }
+            
+            if (!drawCount || drawCount <= 0) {
+                errorElement.textContent = '오류: 추첨할 학생 수를 입력해주세요.';
+                return;
+            }
+            
+            if (totalStudents > studentsData.length) {
+                errorElement.textContent = `오류: CSV 파일에는 ${studentsData.length}명의 학생만 있습니다.`;
+                return;
+            }
+            
+            if (drawCount > totalStudents) {
+                errorElement.textContent = '오류: 추첨할 학생 수가 전체 학생 수보다 많습니다.';
+                return;
+            }
+            
+            // 전체 학생 수만큼만 사용
+            const studentsPool = studentsData.slice(0, totalStudents);
+            
+            // 랜덤 추첨 (Fisher-Yates shuffle)
+            selectedStudents = [];
+            const shuffled = [...studentsPool];
+            
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            selectedStudents = shuffled.slice(0, drawCount);
+            
+            // 이름 순서대로 정렬
+            selectedStudents.sort();
+            
+            // 결과 표시
+            displayResults();
+        }
+
+        // 결과 표시
+        function displayResults() {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsList = document.getElementById('resultsList');
+            const downloadButton = document.getElementById('downloadButton');
+            
+            resultsList.innerHTML = '';
+            
+            selectedStudents.forEach((student, index) => {
+                const div = document.createElement('div');
+                div.textContent = `${index + 1}. ${student}`;
+                resultsList.appendChild(div);
+            });
+            
+            resultsSection.style.display = 'block';
+            downloadButton.disabled = false;
+        }
+
+        // 결과 다운로드
+        function downloadResults() {
+            if (selectedStudents.length === 0) return;
+            
+            // CSV 형식으로 변환
+            const csvContent = selectedStudents.join('\n');
+            
+            // Blob 생성 및 다운로드
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'raffle_results.csv');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
